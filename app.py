@@ -30,21 +30,46 @@ st.markdown(
         .stChatMessageAssistant {
             background-color: #f8d7da;
         }
+        .chat-container {
+            max-height: 500px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 st.title("🤖 Asistente IA con OpenAI")
-# Inicializar el historial de la conversación en la sesión
-if "thread_id" not in st.session_state:
+
+# Reiniciar el hilo en cada nueva pregunta
+if "thread_id" not in st.session_state or "reset" in st.session_state:
     thread = openai.beta.threads.create()
     st.session_state.thread_id = thread.id
+    if "reset" in st.session_state:
+        del st.session_state["reset"]
+
+# Inicializar el historial de la conversación
+if "history" not in st.session_state:
+    st.session_state.history = []
 
 # Entrada de usuario
 tab1, tab2 = st.tabs(["Chat", "Acerca de"])
 
 with tab1:
+    # Contenedor para el historial de mensajes con desplazamiento
+    with st.container():
+        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        # Mostrar el historial de la conversación
+        for message in st.session_state.history:
+            if message["role"] == "user":
+                with st.chat_message("user", avatar="👤"):
+                    st.markdown(f"**Tú:** {message['content']}")
+            else:
+                with st.chat_message("assistant", avatar="🤖"):
+                    st.markdown(f"**Asistente:** {message['content']}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
     if prompt := st.chat_input("Escribe tu pregunta..."):
         with st.chat_message("user", avatar="👤"):
             st.markdown(f"**Tú:** {prompt}")
@@ -55,6 +80,9 @@ with tab1:
             role="user",
             content=prompt
         )
+    
+        # Agregar la pregunta al historial
+        st.session_state.history.append({"role": "user", "content": prompt})
     
         with st.spinner("Pensando..."):
             run = openai.beta.threads.runs.create(
@@ -78,6 +106,12 @@ with tab1:
             
             with st.chat_message("assistant", avatar="🤖"):
                 st.markdown(f"**Asistente:** {reply}")
+            
+            # Agregar la respuesta al historial
+            st.session_state.history.append({"role": "assistant", "content": reply})
+
+        # Marcar el hilo para reiniciar en la próxima pregunta
+        st.session_state["reset"] = True
 
 with tab2:
     st.subheader("Acerca del Asistente")
